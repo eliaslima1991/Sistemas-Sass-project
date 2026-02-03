@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Compras e Aprovações</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      box-sizing: border-box;
+    }
+    
+    * {
+      font-family: 'Outfit', sans-serif;
+    }
+    
+    .gradient-bg {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+    }
+    
+    .glass-card {
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    }
+    
+    .status-badge {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .status-pendente { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
+    .status-aprovado { background: linear-gradient(135deg, #10b981, #059669); color: white; }
+    .status-reprovado { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
+    .status-analise { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; }
+    .status-ok { background: linear-gradient(135deg, #10b981, #059669); color: white; }
+    .status-estoque.baixo { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
+    
+    .chat-bubble {
+      max-width: 75%;
+      padding: 12px 18px;
+      border-radius: 18px;
+      margin-bottom: 10px;
+      word-wrap: break-word;
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    .chat-user {
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: white;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+    
+    .chat-bot {
+      background: #f1f5f9;
+      color: #1e293b;
+      margin-right: auto;
+      border-bottom-left-radius: 4px;
+    }
+    
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+      50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.5); }
+    }
+    
+    .pulse-animation {
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+    
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+    
+    .urgencia-alta { border-left: 4px solid #ef4444; }
+    .urgencia-media { border-left: 4px solid #f59e0b; }
+    .urgencia-baixa { border-left: 4px solid #10b981; }
+    
+    .tab-active {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .demo-banner {
+      background: linear-gradient(135deg, #8b5cf6, #6366f1);
+      color: white;
+      padding: 12px;
+      text-align: center;
+      font-weight: bold;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+  </style>
+</head>
+<body class="h-full gradient-bg overflow-auto">
+  <div id="app" class="min-h-full w-full">
+    
+    <!-- DEMO BANNER -->
+    <div class="demo-banner">
+      🎯 MODO DEMONSTRAÇÃO ATIVO - Dados de exemplo carregados automaticamente
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed top-20 right-4 z-50 hidden">
+      <div class="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3">
+        <span id="toast-icon" class="text-2xl">✅</span>
+        <span id="toast-message" class="font-semibold text-gray-800"></span>
+      </div>
+    </div>
+
+    <!-- NAVIGATION -->
+    <nav class="bg-white/95 backdrop-blur-lg border-b border-gray-200 sticky top-0 z-40 shadow-lg">
+      <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shadow-xl">
+            <span class="text-2xl">🛒</span>
+          </div>
+          <div>
+            <h1 id="nav-empresa" class="font-bold text-xl text-gray-800">CompraFácil Pro</h1>
+            <p id="nav-slogan" class="text-xs text-blue-600 font-medium">Gestão inteligente de compras</p>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="showView('solicitacao')" class="nav-btn px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-blue-50 text-gray-700">
+            📝 Nova Solicitação
+          </button>
+          <button onclick="showView('aprovacao')" class="nav-btn px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-blue-50 text-gray-700">
+            ✅ Aprovações
+          </button>
+          <button onclick="showView('cotacao')" class="nav-btn px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-blue-50 text-gray-700">
+            💰 Cotações
+          </button>
+          <button onclick="showView('estoque')" class="nav-btn px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-blue-50 text-gray-700">
+            📦 Estoque
+          </button>
+          <button onclick="showView('chatbot')" class="nav-btn px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-blue-50 text-gray-700">
+            💬 ChatBot
+          </button>
+          <button onclick="showView('dashboard')" class="nav-btn px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:bg-blue-50 text-gray-700">
+            📊 Dashboard
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- VIEW: NOVA SOLICITAÇÃO -->
+    <div id="view-solicitacao" class="view-container max-w-5xl mx-auto px-6 py-12">
+      <div class="text-center mb-8">
+        <h2 class="text-4xl font-extrabold mb-3 text-white drop-shadow-lg">📝 Nova Solicitação de Compra</h2>
+        <p class="text-white/90 font-medium">Preencha os dados para criar uma nova solicitação</p>
+      </div>
+
+      <form id="solicitacao-form" class="glass-card rounded-3xl p-8">
+        <div class="grid md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label for="solicitante" class="block text-sm font-bold text-gray-700 mb-2">👤 Solicitante</label>
+            <input type="text" id="solicitante" required class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 font-medium">
+          </div>
+          <div>
+            <label for="departamento" class="block text-sm font-bold text-gray-700 mb-2">🏢 Departamento</label>
+            <select id="departamento" required class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 font-medium">
+              <option value="">Selecione</option>
+              <option value="TI">TI</option>
+              <option value="RH">RH</option>
+              <option value="Financeiro">Financeiro</option>
+              <option value="Operações">Operações</option>
+              <option value="Marketing">Marketing</option>
+              <option value="Vendas">Vendas</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-6 mb-6">
+          <div>
+            <label for="categoria" class="block text-sm font-bold text-gray-700 mb-2">📂 Categoria</label>
+            <select id="categoria" required class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 font-medium">
+              <option value="">Selecione</option>
+              <option value="Material de Escritório">Material de Escritório</option>
+              <option value="Equipamentos">Equipamentos</option>
+              <option value="Software">Software</option>
+              <option value="Serviços">Serviços</option>
+              <option value="Matéria-Prima">Matéria-Prima</option>
+            </select>
+          </div>
+          <div>
+            <label for="urgencia" class="block text-sm font-bold text-gray-700 mb-2">⚡ Urgência</label>
+            <select id="urgencia" required class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 font-medium">
+              <option value="Baixa">🟢 Baixa</option>
+              <option value="Média">🟡 Média</option>
+              <option value="Alta">🔴 Alta</option>
+            </select>
+          </div>
+          <div>
+            <label for="fornecedor" class="block text-sm font-bold text-gray-700 mb-2">🏪 Fornecedor</label>
+            <input type="text" id="fornecedor" required class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 font-medium">
+          </div>
+        </div>
+
+        <div class="mb-6">
+          <label for="produto" class="block text-sm font-bold text-gray-700 mb-2">📦 Produto/Serviço</label>
+          <input type="text" id="produto" required class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 font-medium">
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-6 mb-6">
+          <div>
+            <label for="quantidade" class="block text-sm font-bold text-gray-700 mb-2">🔢 Quantidade</label>
+            <input type="number" id="quantidade" required min="1" class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 font-medium">
+          </div>
+          <div>
+            <label for="valor-unitario" class="block text-sm font-bold text-gray-700 mb-2">💵 Valor Unitário (R$)</label>
+            <input type="number" id="valor-unitario" required min="0" step="0.01" class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 font-medium">
+          </div>
+          <div>
+            <label for="valor-total" class="block text-sm font-bold text-gray-700 mb-2">💰 Valor Total (R$)</label>
+            <input type="text" id="valor-total" readonly class="w-full bg-gray-100 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 font-bold">
+          </div>
+        </div>
+
+        <div class="mb-6">
+          <label for="justificativa" class="block text-sm font-bold text-gray-700 mb-2">📋 Justificativa</label>
+          <textarea id="justificativa" rows="4" required class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-800 font-medium resize-none" placeholder="Descreva a necessidade desta compra..."></textarea>
+        </div>
+
+        <button type="submit" class="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-bold text-lg py-4 px-8 rounded-2xl transition-all transform hover:scale-[1.02] shadow-xl">
+          🚀 Enviar Solicitação
+        </button>
+      </form>
+    </div>
+
+    <!-- VIEW: APROVAÇÕES -->
+    <div id="view-aprovacao" class="view-container hidden max-w-7xl mx-auto px-6 py-12">
+      <div class="mb-8">
+        <h2 class="text-4xl font-extrabold mb-3 text-white drop-shadow-lg">✅ Central de Aprovações</h2>
+        <p class="text-white/90 font-medium">Gerencie as solicitações pendentes de aprovação</p>
+      </div>
+
+      <div class="mb-6 flex gap-3">
+        <button onclick="filterAprovacoes('Pendente')" class="filter-btn px-6 py-3 rounded-xl font-bold text-sm bg-white/20 text-white hover:bg-white/30">
+          ⏳ Pendentes
+        </button>
+        <button onclick="filterAprovacoes('Aprovado')" class="filter-btn px-6 py-3 rounded-xl font-bold text-sm bg-white/20 text-white hover:bg-white/30">
+          ✅ Aprovados
+        </button>
+        <button onclick="filterAprovacoes('Reprovado')" class="filter-btn px-6 py-3 rounded-xl font-bold text-sm bg-white/20 text-white hover:bg-white/30">
+          ❌ Reprovados
+        </button>
+        <button onclick="filterAprovacoes('todos')" class="filter-btn px-6 py-3 rounded-xl font-bold text-sm bg-white/20 text-white hover:bg-white/30">
+          📋 Todos
+        </button>
+      </div>
+
+      <div id="aprovacoes-list" class="space-y-4">
+        <div class="glass-card rounded-2xl p-8 text-center">
+          <span class="text-6xl mb-4 block">📋</span>
+          <p class="text-gray-600 font-semibold">Nenhuma solicitação para aprovar</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW: COTAÇÕES -->
+    <div id="view-cotacao" class="view-container hidden max-w-6xl mx-auto px-6 py-12">
+      <div class="mb-8">
+        <h2 class="text-4xl font-extrabold mb-3 text-white drop-shadow-lg">💰 Acompanhamento de Cotações</h2>
+        <p class="text-white/90 font-medium">Compare preços e escolha a melhor opção</p>
+      </div>
+
+      <div class="glass-card rounded-3xl p-8 mb-6">
+        <h3 class="text-2xl font-bold text-gray-800 mb-6">🔍 Nova Cotação</h3>
+        <form id="cotacao-form" class="grid md:grid-cols-2 gap-6">
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Produto</label>
+            <input type="text" id="cotacao-produto" required class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 font-medium">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Quantidade</label>
+            <input type="number" id="cotacao-quantidade" required min="1" class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 font-medium">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Fornecedor 1</label>
+            <input type="text" id="cotacao-forn1" placeholder="Nome" class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 font-medium mb-2">
+            <input type="number" id="cotacao-valor1" placeholder="Valor (R$)" step="0.01" class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 font-medium">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Fornecedor 2</label>
+            <input type="text" id="cotacao-forn2" placeholder="Nome" class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 font-medium mb-2">
+            <input type="number" id="cotacao-valor2" placeholder="Valor (R$)" step="0.01" class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 font-medium">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Fornecedor 3</label>
+            <input type="text" id="cotacao-forn3" placeholder="Nome" class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 font-medium mb-2">
+            <input type="number" id="cotacao-valor3" placeholder="Valor (R$)" step="0.01" class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 font-medium">
+          </div>
+          <div class="flex items-end">
+            <button type="submit" class="w-full bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 text-white font-bold py-3 px-6 rounded-xl">
+              💾 Salvar Cotação
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div id="cotacoes-list" class="grid gap-4">
+        <div class="glass-card rounded-2xl p-8 text-center">
+          <span class="text-6xl mb-4 block">💰</span>
+          <p class="text-gray-600 font-semibold">Nenhuma cotação cadastrada</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW: CONTROLE DE ESTOQUE -->
+    <div id="view-estoque" class="view-container hidden max-w-6xl mx-auto px-6 py-12">
+      <div class="mb-8">
+        <h2 class="text-4xl font-extrabold mb-3 text-white drop-shadow-lg">📦 Controle de Estoque</h2>
+        <p class="text-white/90 font-medium">Gerencie o inventário de produtos</p>
+      </div>
+
+      <div class="glass-card rounded-3xl p-8 mb-6">
+        <h3 class="text-2xl font-bold text-gray-800 mb-6">➕ Adicionar Produto</h3>
+        <form id="estoque-form" class="grid md:grid-cols-4 gap-4">
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Produto</label>
+            <input type="text" id="estoque-produto" required class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 font-medium">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Quantidade</label>
+            <input type="number" id="estoque-quantidade" required min="0" class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 font-medium">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">Mínimo</label>
+            <input type="number" id="estoque-minimo" required min="0" class="w-full bg-white border-2 border-gray-200 rounded-xl px-4 py-3 font-medium">
+          </div>
+          <div class="flex items-end">
+            <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-purple-800 text-white font-bold py-3 rounded-xl">
+              ➕ Adicionar
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div id="estoque-list" class="grid md:grid-cols-3 gap-4">
+        <div class="glass-card rounded-2xl p-8 text-center md:col-span-3">
+          <span class="text-6xl mb-4 block">📦</span>
+          <p class="text-gray-600 font-semibold">Nenhum produto em estoque</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW: CHATBOT -->
+    <div id="view-chatbot" class="view-container hidden max-w-5xl mx-auto px-6 py-12">
+      <div class="mb-8 text-center">
+        <h2 class="text-4xl font-extrabold mb-3 text-white drop-shadow-lg">💬 Assistente Virtual de Compras</h2>
+        <p class="text-white/90 font-medium">Tire dúvidas e solicite informações sobre compras</p>
+      </div>
+
+      <div class="glass-card rounded-3xl p-6 shadow-2xl">
+        <div class="mb-4 flex items-center justify-between pb-4 border-b-2 border-gray-200">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
+              <span class="text-2xl">🤖</span>
+            </div>
+            <div>
+              <h3 class="font-bold text-gray-800">Bot de Compras</h3>
+              <span class="text-xs text-green-600 font-semibold">● Online</span>
+            </div>
+          </div>
+          <button onclick="limparChatbot()" class="text-sm text-gray-500 hover:text-gray-700 font-semibold">
+            🗑️ Limpar
+          </button>
+        </div>
+
+        <div id="chatbot-messages" class="h-96 overflow-y-auto mb-4 flex flex-col gap-2 px-2">
+          <div class="chat-bubble chat-bot">
+            Olá! 👋 Sou seu assistente virtual de compras. <br><br>
+            Posso te ajudar com:<br>
+            • Status de solicitações<br>
+            • Informações sobre aprovações<br>
+            • Consulta de estoque<br>
+            • Cotações de preços<br>
+            • Troca de aprovadores<br><br>
+            Como posso ajudar?
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <input type="text" id="chatbot-input" placeholder="Digite sua mensagem..." class="flex-1 bg-white border-2 border-gray-200 rounded-2xl px-5 py-3 text-gray-800 font-medium" onkeypress="if(event.key==='Enter') enviarMensagemChatbot()">
+          <button onclick="enviarMensagemChatbot()" class="bg-gradient-to-br from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white px-6 rounded-2xl transition-all shadow-lg">
+            <span class="text-2xl">📤</span>
+          </button>
+        </div>
+
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button onclick="quickQuestion('Status')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold text-gray-700">
+            📊 Ver Status
+          </button>
+          <button onclick="quickQuestion('Estoque')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold text-gray-700">
+            📦 Consultar Estoque
+          </button>
+          <button onclick="quickQuestion('Pendentes')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold text-gray-700">
+            ⏳ Aprovações Pendentes
+          </button>
+          <button onclick="quickQuestion('Trocar Aprovador')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold text-gray-700">
+            🔄 Trocar Aprovador
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW: DASHBOARD -->
+    <div id="view-dashboard" class="view-container hidden max-w-7xl mx-auto px-6 py-12">
+      <div class="mb-8">
+        <h2 class="text-4xl font-extrabold mb-3 text-white drop-shadow-lg">📊 Dashboard Geral</h2>
+        <p class="text-white/90 font-medium">Visão completa do sistema de compras</p>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="glass-card rounded-2xl p-6">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="text-3xl">📋</spa
